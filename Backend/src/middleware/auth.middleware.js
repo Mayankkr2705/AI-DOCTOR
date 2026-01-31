@@ -19,9 +19,9 @@ const authMiddleware = async (req, res, next) => {
     }
 
     req.user = user;
-    next();
+    return next();
   } catch (error) {
-    res.status(401).json({ error: 'Token is not valid' });
+    return res.status(401).json({ error: 'Token is not valid' });
   }
 };
 

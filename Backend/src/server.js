@@ -31,7 +31,6 @@ app.use('/api/news', newsRoutes);
 app.get('/health', (req, res) => {
   res.json({ status: 'OK', message: 'Medical AI Chatbot API is running' });
 });
-
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);
