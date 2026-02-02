@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Send, Bot, User, Loader } from 'lucide-react';
 import { chatAPI } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
 const MODES = [
   { id: 'child', name: 'Pediatric Care', emoji: '👶', color: 'bg-blue-500' },
@@ -9,6 +10,103 @@ const MODES = [
   { id: 'animal', name: 'Veterinary Care', emoji: '🐾', color: 'bg-orange-500' }
 ];
 
+// Guest mode responses
+const getGuestResponse = (message, mode) => {
+  const lowerMessage = message.toLowerCase();
+  
+  const modeGreetings = {
+    child: "As a pediatric health assistant",
+    adult: "As a general health assistant",
+    female: "As a women's health assistant",
+    animal: "As a veterinary health assistant"
+  };
+
+  if (lowerMessage.includes('headache') || lowerMessage.includes('head pain')) {
+    return `${modeGreetings[mode]}, I can share some general information about headaches.
+
+**Common causes:**
+• Stress and tension
+• Dehydration
+• Lack of sleep
+• Eye strain from screens
+
+**General tips:**
+• Stay hydrated - drink plenty of water
+• Get adequate rest (7-9 hours)
+• Take breaks from screens
+• Try relaxation techniques
+
+**Seek medical attention if:**
+• Severe or sudden headache
+• Headache with fever or stiff neck
+• Vision changes
+
+⚠️ *This is general information. Please consult a healthcare provider for personalized advice.*`;
+  }
+
+  if (lowerMessage.includes('fever') || lowerMessage.includes('temperature')) {
+    return `${modeGreetings[mode]}, here's some information about fever.
+
+**What is fever?**
+A fever is usually a sign your body is fighting an infection.
+
+**General care:**
+• Rest and stay hydrated
+• Use light clothing
+• Monitor temperature regularly
+
+**When to seek help:**
+• Temperature above 103°F (39.4°C)
+• Fever lasting more than 3 days
+• Accompanied by severe symptoms
+
+⚠️ *Please consult a healthcare provider for proper diagnosis.*`;
+  }
+
+  if (lowerMessage.includes('cold') || lowerMessage.includes('cough') || lowerMessage.includes('flu')) {
+    return `${modeGreetings[mode]}, here's information about cold and flu symptoms.
+
+**Self-care tips:**
+• Get plenty of rest
+• Stay hydrated with water, tea, or broth
+• Use honey for cough relief (not for children under 1)
+• Saline nasal spray for congestion
+
+**See a doctor if:**
+• Symptoms worsen after a week
+• High fever or difficulty breathing
+• Underlying health conditions
+
+⚠️ *This is general information only. Consult a healthcare provider if symptoms persist.*`;
+  }
+
+  if (lowerMessage.includes('hello') || lowerMessage.includes('hi') || lowerMessage.includes('hey')) {
+    return `Hello! ${modeGreetings[mode]}, I'm here to help answer your health questions. What would you like to know about today?
+
+You can ask me about:
+• Common symptoms and conditions
+• General health tips
+• When to seek medical care
+
+⚠️ *Remember: I provide general information only, not medical diagnoses.*`;
+  }
+
+  return `${modeGreetings[mode]}, thank you for your question about "${message}".
+
+**General Health Tips:**
+• Maintain a balanced diet with fruits and vegetables
+• Exercise regularly (at least 150 minutes per week)
+• Get 7-9 hours of quality sleep
+• Stay hydrated throughout the day
+• Manage stress through relaxation techniques
+• Schedule regular check-ups with healthcare providers
+
+**Important Reminder:**
+For specific health concerns, symptoms, or conditions, please consult with a qualified healthcare professional who can provide personalized medical advice.
+
+⚠️ *This is a demo response. For full AI-powered responses, please sign up for an account.*`;
+};
+
 const ChatbotPage = () => {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
@@ -16,6 +114,7 @@ const ChatbotPage = () => {
   const [conversationId, setConversationId] = useState(null);
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef(null);
+  const { isGuest } = useAuth();
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -25,7 +124,16 @@ const ChatbotPage = () => {
     scrollToBottom();
   }, [messages]);
 
+  // Load guest messages from localStorage
   useEffect(() => {
+    if (isGuest) {
+      const savedMessages = localStorage.getItem(`guest_chat_${mode}`);
+      if (savedMessages) {
+        setMessages(JSON.parse(savedMessages));
+        return;
+      }
+    }
+    
     // Reset conversation when mode changes
     setMessages([]);
     setConversationId(null);
@@ -36,7 +144,14 @@ const ChatbotPage = () => {
       role: 'assistant',
       content: `Hello! I'm your ${selectedMode.name} assistant ${selectedMode.emoji}. How can I help you today?`
     }]);
-  }, [mode]);
+  }, [mode, isGuest]);
+
+  // Save guest messages to localStorage
+  useEffect(() => {
+    if (isGuest && messages.length > 0) {
+      localStorage.setItem(`guest_chat_${mode}`, JSON.stringify(messages));
+    }
+  }, [messages, mode, isGuest]);
 
   const handleSend = async () => {
     if (!input.trim() || loading) return;
@@ -48,6 +163,20 @@ const ChatbotPage = () => {
     setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
     setLoading(true);
 
+    // Guest mode - use local responses
+    if (isGuest) {
+      setTimeout(() => {
+        const response = getGuestResponse(userMessage, mode);
+        setMessages(prev => [...prev, { 
+          role: 'assistant', 
+          content: response 
+        }]);
+        setLoading(false);
+      }, 1000); // Simulate API delay
+      return;
+    }
+
+    // Authenticated user - use API
     try {
       const response = await chatAPI.sendMessage(userMessage, mode, conversationId);
       

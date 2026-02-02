@@ -1,11 +1,17 @@
-import { Link } from 'react-router-dom';
-import { Stethoscope, Menu, X, UserCircle, Home, Bot, FileBarChart, Rss, LayoutDashboard } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Stethoscope, Menu, X, UserCircle, Home, Bot, FileBarChart, Rss, LayoutDashboard, LogOut, LogIn, UserPlus } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+
+  const handleSignOut = () => {
+    logout();
+    navigate('/signin');
+  };
 
   return (
     <nav className="bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 shadow-lg sticky top-0 z-50">
@@ -41,10 +47,39 @@ const Navbar = () => {
               <span>Health News</span>
             </Link>
             <div className="flex items-center space-x-3 ml-4 pl-4 border-l border-white/30">
-              <span className="text-white/90 flex items-center">
-                <UserCircle className="h-5 w-5 mr-1" />
-                {user?.name}
-              </span>
+              {user ? (
+                <>
+                  <span className="text-white/90 flex items-center">
+                    <UserCircle className="h-5 w-5 mr-1" />
+                    {user.name}
+                  </span>
+                  <button
+                    onClick={handleSignOut}
+                    className="flex items-center space-x-1 text-white/90 hover:text-white hover:bg-white/10 px-3 py-1.5 rounded-lg transition"
+                    title="Sign Out"
+                  >
+                    <LogOut className="h-5 w-5" />
+                    <span>Sign Out</span>
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Link
+                    to="/signin"
+                    className="flex items-center space-x-1 text-white/90 hover:text-white hover:bg-white/10 px-3 py-1.5 rounded-lg transition"
+                  >
+                    <LogIn className="h-5 w-5" />
+                    <span>Sign In</span>
+                  </Link>
+                  <Link
+                    to="/signup"
+                    className="flex items-center space-x-1 bg-white text-teal-600 hover:bg-white/90 px-3 py-1.5 rounded-lg transition font-medium"
+                  >
+                    <UserPlus className="h-5 w-5" />
+                    <span>Sign Up</span>
+                  </Link>
+                </>
+              )}
             </div>
           </div>
 
@@ -104,10 +139,43 @@ const Navbar = () => {
               <Rss className="h-4 w-4" />
               <span>Health News</span>
             </Link>
-            <div className="px-3 py-2 text-white/80 flex items-center space-x-2 border-t border-white/20 mt-2 pt-2">
-              <UserCircle className="h-5 w-5" />
-              <span>{user?.name}</span>
-            </div>
+            {user ? (
+              <>
+                <div className="px-3 py-2 text-white/80 flex items-center space-x-2 border-t border-white/20 mt-2 pt-2">
+                  <UserCircle className="h-5 w-5" />
+                  <span>{user.name}</span>
+                </div>
+                <button
+                  onClick={() => {
+                    setIsOpen(false);
+                    handleSignOut();
+                  }}
+                  className="flex items-center space-x-2 px-3 py-2 text-white hover:bg-white/10 rounded w-full text-left"
+                >
+                  <LogOut className="h-4 w-4" />
+                  <span>Sign Out</span>
+                </button>
+              </>
+            ) : (
+              <div className="border-t border-white/20 mt-2 pt-2">
+                <Link
+                  to="/signin"
+                  className="flex items-center space-x-2 px-3 py-2 text-white hover:bg-white/10 rounded"
+                  onClick={() => setIsOpen(false)}
+                >
+                  <LogIn className="h-4 w-4" />
+                  <span>Sign In</span>
+                </Link>
+                <Link
+                  to="/signup"
+                  className="flex items-center space-x-2 px-3 py-2 text-white hover:bg-white/10 rounded"
+                  onClick={() => setIsOpen(false)}
+                >
+                  <UserPlus className="h-4 w-4" />
+                  <span>Sign Up</span>
+                </Link>
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -1,54 +1,89 @@
 import { createContext, useState, useEffect, useContext } from 'react';
 import axios from 'axios';
+import { authAPI } from '../services/api';
 
 const AuthContext = createContext(null);
 
-const API_URL = 'http://localhost:5000/api';
-
-// Mock user for bypassing authentication
-const MOCK_USER = {
-  id: '1',
-  name: 'Guest User',
-  email: 'guest@medicareai.com',
-  role: 'user'
-};
-
 export const AuthProvider = ({ children }) => {
-  // Always authenticated with mock user (bypass login)
-  const [user, setUser] = useState(MOCK_USER);
-  const [loading, setLoading] = useState(false);
-  const [token, setToken] = useState('mock-token');
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [token, setToken] = useState(localStorage.getItem('token'));
 
   // Set axios default headers
   useEffect(() => {
     if (token) {
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      localStorage.setItem('token', token);
     } else {
       delete axios.defaults.headers.common['Authorization'];
+      localStorage.removeItem('token');
     }
   }, [token]);
 
+  // Check if user is already logged in on mount
+  useEffect(() => {
+    const checkAuth = async () => {
+      if (token) {
+        try {
+          const data = await authAPI.getcurr();
+          setUser(data.user);
+        } catch (error) {
+          console.error('Auth check failed:', error);
+          setToken(null);
+          setUser(null);
+        }
+      }
+      setLoading(false);
+    };
+    checkAuth();
+  }, []);
+
   const login = async (email, password) => {
-    // Bypass login - always succeed
-    setUser(MOCK_USER);
-    setToken('mock-token');
-    return { success: true };
+    try {
+      const data = await authAPI.login(email, password);
+      setToken(data.token);
+      setUser(data.user);
+      return { success: true };
+    } catch (error) {
+      return { 
+        success: false, 
+        error: error.response?.data?.error || 'Login failed. Please try again.' 
+      };
+    }
   };
 
   const register = async (name, email, password) => {
-    // Bypass registration - always succeed
-    setUser({ ...MOCK_USER, name: name || 'Guest User', email: email || 'guest@medicareai.com' });
-    setToken('mock-token');
-    return { success: true };
+    try {
+      const data = await authAPI.register(name, email, password);
+      setToken(data.token);
+      setUser(data.user);
+      return { success: true };
+    } catch (error) {
+      return { 
+        success: false, 
+        error: error.response?.data?.error || 'Registration failed. Please try again.' 
+      };
+    }
   };
 
   const logout = () => {
-    // Bypass logout - keep user logged in
-    // Uncomment below to enable actual logout:
-    // localStorage.removeItem('token');
-    // setToken(null);
-    // setUser(null);
-    console.log('Logout bypassed for development');
+    localStorage.removeItem('token');
+    localStorage.removeItem('isGuest');
+    setToken(null);
+    setUser(null);
+  };
+
+  const loginAsGuest = () => {
+    const guestUser = {
+      id: 'guest',
+      name: 'Guest User',
+      email: 'guest@medicareai.com',
+      role: 'guest'
+    };
+    setUser(guestUser);
+    setToken('guest-token');
+    localStorage.setItem('isGuest', 'true');
+    return { success: true };
   };
 
   const value = {
@@ -57,7 +92,9 @@ export const AuthProvider = ({ children }) => {
     login,
     register,
     logout,
-    isAuthenticated: !!user
+    loginAsGuest,
+    isAuthenticated: !!user,
+    isGuest: localStorage.getItem('isGuest') === 'true'
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
