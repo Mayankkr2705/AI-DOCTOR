@@ -1,7 +1,32 @@
 const Report = require('../models/Report');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const axios = require('axios');
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+// Groq API configuration
+const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
+const GROQ_API_KEY = process.env.GROQ_API_KEY;
+
+// Mock analysis generator when API is unavailable
+function getMockAnalysis(report) {
+  return `## Summary
+This is an automated analysis of your ${report.reportType || 'medical'} report titled "${report.title}".
+
+The report has been received and processed. Due to the AI service being temporarily unavailable, this is a placeholder analysis. Please consult with your healthcare provider for accurate interpretation of your results.
+
+## Key Findings
+- Report type: ${report.reportType || 'General'}
+- Report submitted successfully
+- Data received for analysis
+- Awaiting full AI analysis (service temporarily unavailable)
+
+## Recommendations
+- Schedule a follow-up appointment with your healthcare provider
+- Bring this report to your next medical consultation
+- Keep track of any symptoms or changes
+- Maintain a healthy lifestyle with proper diet and exercise
+- Stay hydrated and get adequate rest
+
+⚠️ **Disclaimer:** This is a demo analysis. The AI service is currently unavailable. For accurate medical interpretation, please consult a qualified healthcare professional.`;
+}
 
 const uploadReport = async (req, res) => {
   try {
@@ -42,25 +67,58 @@ const analyzeReport = async (req, res) => {
       return res.status(404).json({ error: 'Report not found' });
     }
 
-    // Generate AI analysis
-    const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
-    
-    const prompt = `You are a medical AI assistant. Analyze the following medical report data and provide:
-1. A brief summary
-2. Key findings (as bullet points)
-3. General recommendations (as bullet points)
+    let analysisText;
 
-Remember: This is not a substitute for professional medical advice. Always recommend consulting healthcare professionals.
+    // Try Groq API, fallback to mock analysis if unavailable
+    if (GROQ_API_KEY) {
+      try {
+        const prompt = `You are a medical AI assistant. Analyze the following medical report data and provide:
+            1. A brief summary
+            2. Key findings (as bullet points)
+            3. General recommendations (as bullet points)
 
-Report Type: ${report.reportType}
-Report Title: ${report.title}
-Report Data:
-${report.reportData}
+            Remember: This is not a substitute for professional medical advice. Always recommend consulting healthcare professionals.
 
-Provide your analysis in a structured format.`;
+            Report Type: ${report.reportType}
+            Report Title: ${report.title}
+            Report Data:
+            ${report.reportData}
 
-    const result = await model.generateContent(prompt);
-    const analysisText = result.response.text();
+            Provide your analysis in a structured format.`;
+
+        const groqResponse = await axios.post(
+          GROQ_API_URL,
+          {
+            model: 'llama-3.3-70b-versatile',
+            messages: [
+              {
+                role: 'system',
+                content: 'You are a medical AI assistant that analyzes medical reports and provides structured analysis.'
+              },
+              {
+                role: 'user',
+                content: prompt
+              }
+            ],
+            temperature: 0.7,
+            max_tokens: 2048
+          },
+          {
+            headers: {
+              'Authorization': `Bearer ${GROQ_API_KEY}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+
+        analysisText = groqResponse.data.choices[0].message.content;
+      } catch (apiError) {
+        console.error('Groq API Error:', apiError.response?.data || apiError.message);
+        analysisText = getMockAnalysis(report);
+      }
+    } else {
+      analysisText = getMockAnalysis(report);
+    }
 
     // Parse the analysis (simple parsing - can be enhanced)
     const summary = analysisText.substring(0, 500);
@@ -87,7 +145,6 @@ Provide your analysis in a structured format.`;
   }
 };
 
-// Helper function to extract bullet points
 function extractBulletPoints(text, section) {
   const points = [];
   const lines = text.split('\n');
@@ -130,7 +187,6 @@ const getReports = async (req, res) => {
   }
 };
 
-// Get single report
 const getReport = async (req, res) => {
   try {
     const { reportId } = req.params;

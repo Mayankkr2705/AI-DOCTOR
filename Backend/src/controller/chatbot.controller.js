@@ -1,31 +1,35 @@
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const axios = require('axios');
 const ChatHistory = require('../models/ChatHistory');
 
-// Initialize Gemini AI
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+// Groq API configuration
+const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
+const GROQ_API_KEY = process.env.GROQ_API_KEY;
 
 // Mode-specific system prompts
 const modePrompts = {
   child: `You are a pediatrician (child doctor) AI assistant. You specialize in children's health, 
-from newborns to teenagers. Provide medical information in a caring, reassuring tone. 
-Focus on common childhood illnesses, vaccinations, growth milestones, and pediatric care. 
-Always recommend consulting a real pediatrician for serious concerns.`,
+          from newborns to teenagers. Provide medical information in a caring, reassuring tone. 
+          Focus on common childhood illnesses, vaccinations, growth milestones, and pediatric care. 
+          Always recommend consulting a real pediatrician for serious concerns.`,
 
   adult: `You are a general physician AI assistant specializing in adult healthcare. 
-Provide medical information for adults covering general health, chronic conditions, 
-preventive care, and lifestyle management. Use professional but accessible language. 
-Always recommend consulting a healthcare provider for diagnosis and treatment.`,
+          Provide medical information for adults covering general health, chronic conditions, 
+          preventive care, and lifestyle management. Use professional but accessible language. 
+          Always recommend consulting a healthcare provider for diagnosis and treatment.`,
 
   female: `You are a women's health specialist AI assistant. Focus on women's health issues 
-including reproductive health, pregnancy, menstrual health, menopause, and gender-specific 
-medical concerns. Provide empathetic, accurate information while maintaining professional boundaries. 
-Always recommend consulting a healthcare provider for personal medical advice.`,
+          including reproductive health, pregnancy, menstrual health, menopause, and gender-specific 
+          medical concerns. Provide empathetic, accurate information while maintaining professional boundaries. 
+          Always recommend consulting a healthcare provider for personal medical advice.`,
 
   animal: `You are a veterinary AI assistant. Provide information about animal health, 
-covering various pets and animals. Discuss symptoms, common conditions, preventive care, 
-nutrition, and general animal wellness. Always recommend consulting a licensed veterinarian 
-for diagnosis and treatment of animals.`
+      covering various pets and animals. Discuss symptoms, common conditions, preventive care, 
+      nutrition, and general animal wellness. Always recommend consulting a licensed veterinarian 
+      for diagnosis and treatment of animals.`
 };
+
+// Mock response generator when API is unavailable
+
 
 const chat = async (req, res) => {
   try {
@@ -61,23 +65,50 @@ const chat = async (req, res) => {
       content: message
     });
 
-    // Generate AI response
-    const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
-    
-    // Build conversation context
-    const conversationContext = chatHistory.messages
-      .slice(-5) // Last 5 messages for context
-      .map(msg => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`)
-      .join('\n');
+    let response;
 
-    const prompt = `${modePrompts[mode]}
+    // Try Groq API, fallback to mock response if unavailable
+    if (GROQ_API_KEY) {
+      try {
+        const conversationMessages = chatHistory.messages
+          .slice(-5)
+          .map(msg => ({
+            role: msg.role === 'user' ? 'user' : 'assistant',
+            content: msg.content
+          }));
 
-${conversationContext}
+        const groqResponse = await axios.post(
+          GROQ_API_URL,
+          {
+            model: 'llama-3.3-70b-versatile',
+            messages: [
+              {
+                role: 'system',
+                content: modePrompts[mode] + '\n\nPlease provide a helpful, accurate response. Keep responses concise but informative.'
+              },
+              ...conversationMessages
+            ],
+            temperature: 0.7,
+            max_tokens: 1024
+          },
+          {
+            headers: {
+              'Authorization': `Bearer ${GROQ_API_KEY}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
 
-Please provide a helpful, accurate response to the latest user message. Keep responses concise but informative.`;
-
-    const result = await model.generateContent(prompt);
-    const response = result.response.text();
+        response = groqResponse.data.choices[0].message.content;
+      } catch (apiError) {
+        console.error('Groq API Error:', apiError.response?.data || apiError.message);
+        
+      }
+    } else {
+      // No API key, use mock response
+      console.log("No api key");
+      
+    }
 
     // Add assistant message
     chatHistory.messages.push({
