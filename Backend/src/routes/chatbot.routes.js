@@ -7,6 +7,7 @@ const authMiddleware = require('../middleware/auth.middleware');
 router.use(authMiddleware);
 
 router.post('/chat', chatbotController.chat);
+router.post('/health-score', chatbotController.analyzeHealthScore);
 router.get('/history', chatbotController.getHistory);
 router.get('/history/:conversationId', chatbotController.getHistory);
 router.delete('/history/:conversationId', chatbotController.deleteConversation);

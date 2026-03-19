@@ -1,5 +1,63 @@
 const Report = require('../models/Report');
 const axios = require('axios');
+const fs = require('fs/promises');     // Provides methods to interact with the file system using Promises (async/await)
+const path = require('path');          // Utility for handling and transforming file paths (ensures cross-platform compatibility)
+const { CanvasFactory } = require('pdf-parse/worker');
+const { PDFParse } = require('pdf-parse');
+
+class UploadValidationError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = 'UploadValidationError';
+    this.statusCode = 400;
+  }
+}
+
+let pdfJsLib;
+
+async function getPdfJsLib() {
+  if (!pdfJsLib) {
+    const imported = await import('pdfjs-dist/legacy/build/pdf.mjs');
+    pdfJsLib = imported;
+  }
+  return pdfJsLib;
+}
+
+async function extractPdfTextWithPdfJs(buffer) {
+  const { getDocument } = await getPdfJsLib();
+  const loadingTask = getDocument({ data: new Uint8Array(buffer), disableWorker: true });
+  const pdf = await loadingTask.promise;
+
+  const pageTexts = [];
+
+  for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+    const page = await pdf.getPage(pageNumber);
+    const content = await page.getTextContent();
+    const text = content.items
+      .map((item) => ('str' in item ? item.str : ''))
+      .join(' ')
+      .trim();
+
+    if (text) {
+      pageTexts.push(text);
+    }
+  }
+
+  return pageTexts.join('\n').trim();
+}
+
+async function extractPdfTextWithPdfParse(buffer) {
+  const parser = new PDFParse({ data: buffer, CanvasFactory });
+
+  try {
+    const parsed = await parser.getText();
+    return (parsed?.text || '').trim();
+  } finally {
+    await parser.destroy().catch(() => {
+      // Ignore parser cleanup errors
+    });
+  }
+}
 
 // Groq API configuration
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
@@ -28,13 +86,85 @@ The report has been received and processed. Due to the AI service being temporar
 ⚠️ **Disclaimer:** This is a demo analysis. The AI service is currently unavailable. For accurate medical interpretation, please consult a qualified healthcare professional.`;
 }
 
+async function extractTextFromFile(file) {
+  if (!file) return '';
+
+  const extension = path.extname(file.originalname || '').toLowerCase();
+  const mimeType = file.mimetype || '';
+
+  // PDF extraction
+  if (extension === '.pdf' || mimeType === 'application/pdf') {
+    try {
+      const buffer = await fs.readFile(file.path);
+      const primaryText = await extractPdfTextWithPdfParse(buffer).catch(() => ''); //yeh work nhi kar raha ha, so added fallback to pdfjs
+
+      if (primaryText) {
+        console.log('Text extracted using pdf-parse');
+        return primaryText;
+      }
+
+      const fallbackText = await extractPdfTextWithPdfJs(buffer).catch(() => '');
+
+      if (fallbackText) {
+        return fallbackText;
+      }
+
+      throw new UploadValidationError('No readable text found in this PDF. It may be a scanned/image-only file. Please upload a text-based PDF or TXT file.');
+    } catch (error) {
+      if (error instanceof UploadValidationError) {
+        throw error;
+      }
+      throw new UploadValidationError('Could not read this PDF file. Please upload a valid text-based PDF.');
+    }
+  }
+
+  // Plain text extraction
+  if (
+    extension === '.txt' ||
+    extension === '.csv' ||
+    extension === '.json' ||
+    mimeType.startsWith('text/') ||
+    mimeType === 'application/json'
+  ) {
+    try {
+      const text = await fs.readFile(file.path, 'utf8');
+      return (text || '').trim();
+    } catch (error) {
+      throw new UploadValidationError('Could not read the uploaded text file.');
+    }
+  }
+
+  throw new UploadValidationError('Unsupported file type. Please upload PDF, TXT, CSV, or JSON files only.');
+}
+
 const uploadReport = async (req, res) => {
   try {
-    const { title, description, reportType, reportData } = req.body;
+    const { title, description, reportType, reportData: manualReportData } = req.body;
     const userId = req.user._id;
+    const uploadedFile = req.file;
 
-    if (!title || !reportData) {
-      return res.status(400).json({ error: 'Title and report data are required' });
+    if (!title) {
+      return res.status(400).json({ error: 'Title is required' });
+    }
+
+    let reportData = (manualReportData || '').trim();
+    let fileUrl;
+
+    if (uploadedFile) {
+      const extractedText = await extractTextFromFile(uploadedFile);
+
+      if (!extractedText) {
+        return res.status(400).json({
+          error: 'Unable to extract text from the uploaded file. Please upload a readable PDF, TXT, CSV, or JSON file.'
+        });
+      }
+
+      reportData = extractedText;
+      fileUrl = `/uploads/reports/${uploadedFile.filename}`;
+    }
+
+    if (!reportData) {
+      return res.status(400).json({ error: 'Report file is required' });
     }
 
     const report = new Report({
@@ -42,6 +172,7 @@ const uploadReport = async (req, res) => {
       title,
       description,
       reportType,
+      fileUrl,
       reportData,
       status: 'pending'
     });
@@ -53,7 +184,8 @@ const uploadReport = async (req, res) => {
       report
     });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('Upload report error:', error);
+    res.status(error.statusCode || 500).json({ error: error.message || 'Failed to upload report' });
   }
 };
 
@@ -209,11 +341,19 @@ const deleteReport = async (req, res) => {
     const { reportId } = req.params;
     const userId = req.user._id;
 
-    const result = await Report.deleteOne({ _id: reportId, userId });
-    
-    if (result.deletedCount === 0) {
+    const report = await Report.findOne({ _id: reportId, userId });
+    if (!report) {
       return res.status(404).json({ error: 'Report not found' });
     }
+
+    if (report.fileUrl) {
+      const filePath = path.join(__dirname, '../../', report.fileUrl.replace(/^\//, ''));
+      await fs.unlink(filePath).catch(() => {
+        // Ignore file deletion errors to avoid blocking DB cleanup
+      });
+    }
+
+    await Report.deleteOne({ _id: reportId, userId });
 
     res.json({ message: 'Report deleted successfully' });
   } catch (error) {

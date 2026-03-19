@@ -2,6 +2,8 @@ const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const mongoose = require('mongoose');
+const path = require('path');
+const multer = require('multer');
 
 dotenv.config();
 
@@ -15,6 +17,7 @@ const app = express();
 // Middleware
 app.use(cors());
 app.use(express.json());
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 
 // Database connection
@@ -34,6 +37,21 @@ app.get('/health', (req, res) => {
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);
+
+  if (err instanceof multer.MulterError) {
+    return res.status(400).json({
+      error: 'File upload error',
+      message: err.message
+    });
+  }
+
+  if (err?.message?.includes('Unsupported file type')) {
+    return res.status(400).json({
+      error: 'Invalid file type',
+      message: err.message
+    });
+  }
+
   res.status(500).json({ 
     error: 'Something went wrong!',
     message: err.message 
