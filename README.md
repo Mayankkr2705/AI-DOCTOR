@@ -157,13 +157,15 @@ A comprehensive medical AI assistant with Groq-powered chat, report analysis, he
 
 ## Future Enhancements
 
-- OCR support for scanned/image-only PDFs
-- Voice input for chatbot
-- Appointment scheduling
-- Multi-language support
-- Health tracking and analytics
-- Integration with wearable devices
-- Video consultation booking
+- **Clinic & Doctor Directory:** Integrated database of local doctors, clinics, and hospitals containing verified physical addresses, specialty areas, consulting hours, and phone numbers.
+- **Symptom-Based Clinic Locator:** Automatically match symptom analysis outcomes from chats with nearby medical centers or specific clinical departments.
+- **Direct Clinic Contact & Scheduling:** Direct dial links and embedded messaging cards to contact local clinics instantly.
+- **OCR Support:** Optical Character Recognition (OCR) support for scanned, image-only PDF reports and diagnostic photos.
+- **Voice Consultation:** Voice-to-text input and natural-sounding text-to-speech feedback for the AI chatbot interfaces.
+- **Prescription & Refill Tracking:** Safe indexing of electronic prescriptions with medication refill reminders and pharmacy forwarding.
+- **Dosage & Vaccine Reminders:** Automated push/SMS reminders for prescription schedules, check-up follow-ups, and pediatric vaccination plans.
+- **Wearable Device Integration:** Live syncing of health score metrics with smartwatches and fitness bands (Apple HealthKit, Google Fit).
+- **Video Consultation Booking:** Secure, end-to-end encrypted telehealth video consultation sessions with specialists.
 
 ## License
 
