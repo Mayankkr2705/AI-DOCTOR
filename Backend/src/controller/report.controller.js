@@ -1,195 +1,120 @@
-const Report = require('../models/Report');
-const axios = require('axios');
-const fs = require('fs/promises');     // Provides methods to interact with the file system using Promises (async/await)
-const path = require('path');          // Utility for handling and transforming file paths (ensures cross-platform compatibility)
-const { CanvasFactory } = require('pdf-parse/worker');
-const { PDFParse } = require('pdf-parse');
+import Report from '../models/Report.js';
+import axios from 'axios';
+import path from 'path';
+import { PDFParse } from 'pdf-parse';
+import { fileURLToPath } from 'url';
+import cloudinary from '../config/cloudinary.js';
 
-class UploadValidationError extends Error {
-  constructor(message) {
-    super(message);
-    this.name = 'UploadValidationError';
-    this.statusCode = 400;
-  }
-}
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-let pdfJsLib;
-
-async function getPdfJsLib() {
-  if (!pdfJsLib) {
-    const imported = await import('pdfjs-dist/legacy/build/pdf.mjs');
-    pdfJsLib = imported;
-  }
-  return pdfJsLib;
-}
-
-async function extractPdfTextWithPdfJs(buffer) {
-  const { getDocument } = await getPdfJsLib();
-  const loadingTask = getDocument({ data: new Uint8Array(buffer), disableWorker: true });
-  const pdf = await loadingTask.promise;
-
-  const pageTexts = [];
-
-  for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
-    const page = await pdf.getPage(pageNumber);
-    const content = await page.getTextContent();
-    const text = content.items
-      .map((item) => ('str' in item ? item.str : ''))
-      .join(' ')
-      .trim();
-
-    if (text) {
-      pageTexts.push(text);
-    }
-  }
-
-  return pageTexts.join('\n').trim();
-}
-
-async function extractPdfTextWithPdfParse(buffer) {
-  const parser = new PDFParse({ data: buffer, CanvasFactory });
-
-  try {
-    const parsed = await parser.getText();
-    return (parsed?.text || '').trim();
-  } finally {
-    await parser.destroy().catch(() => {
-      // Ignore parser cleanup errors
-    });
-  }
-}
-
-// Groq API configuration
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 
-// Mock analysis generator when API is unavailable
-function getMockAnalysis(report) {
-  return `## Summary
-This is an automated analysis of your ${report.reportType || 'medical'} report titled "${report.title}".
+async function getTextFromBuffer(buffer, originalname) {
+  const extension = path.extname(originalname).toLowerCase();
 
-The report has been received and processed. Due to the AI service being temporarily unavailable, this is a placeholder analysis. Please consult with your healthcare provider for accurate interpretation of your results.
-
-## Key Findings
-- Report type: ${report.reportType || 'General'}
-- Report submitted successfully
-- Data received for analysis
-- Awaiting full AI analysis (service temporarily unavailable)
-
-## Recommendations
-- Schedule a follow-up appointment with your healthcare provider
-- Bring this report to your next medical consultation
-- Keep track of any symptoms or changes
-- Maintain a healthy lifestyle with proper diet and exercise
-- Stay hydrated and get adequate rest
-
-⚠️ **Disclaimer:** This is a demo analysis. The AI service is currently unavailable. For accurate medical interpretation, please consult a qualified healthcare professional.`;
-}
-
-async function extractTextFromFile(file) {
-  if (!file) return '';
-
-  const extension = path.extname(file.originalname || '').toLowerCase();
-  const mimeType = file.mimetype || '';
-
-  // PDF extraction
-  if (extension === '.pdf' || mimeType === 'application/pdf') {
+  if (extension === '.pdf') {
+    const parser = new PDFParse({ data: buffer });
     try {
-      const buffer = await fs.readFile(file.path);
-      const primaryText = await extractPdfTextWithPdfParse(buffer).catch(() => ''); //yeh work nhi kar raha ha, so added fallback to pdfjs
-
-      if (primaryText) {
-        console.log('Text extracted using pdf-parse');
-        return primaryText;
-      }
-
-      const fallbackText = await extractPdfTextWithPdfJs(buffer).catch(() => '');
-
-      if (fallbackText) {
-        return fallbackText;
-      }
-
-      throw new UploadValidationError('No readable text found in this PDF. It may be a scanned/image-only file. Please upload a text-based PDF or TXT file.');
+      const data = await parser.getText();
+      return data.text;
     } catch (error) {
-      if (error instanceof UploadValidationError) {
-        throw error;
-      }
-      throw new UploadValidationError('Could not read this PDF file. Please upload a valid text-based PDF.');
+      console.error('Error parsing PDF from buffer:', error);
+      throw new Error('Could not read text from the PDF buffer.');
+    } finally {
+      await parser.destroy().catch(() => { });
     }
   }
 
-  // Plain text extraction
-  if (
-    extension === '.txt' ||
-    extension === '.csv' ||
-    extension === '.json' ||
-    mimeType.startsWith('text/') ||
-    mimeType === 'application/json'
-  ) {
-    try {
-      const text = await fs.readFile(file.path, 'utf8');
-      return (text || '').trim();
-    } catch (error) {
-      throw new UploadValidationError('Could not read the uploaded text file.');
-    }
-  }
-
-  throw new UploadValidationError('Unsupported file type. Please upload PDF, TXT, CSV, or JSON files only.');
+  return buffer.toString('utf8');
 }
 
-const uploadReport = async (req, res) => {
+export const uploadReport = async (req, res) => {
   try {
-    const { title, description, reportType, reportData: manualReportData } = req.body;
-    const userId = req.user._id;
-    const uploadedFile = req.file;
+    const { title, description, reportType } = req.body;
+    const userId = req.user._id || req.user.id;
 
-    if (!title) {
-      return res.status(400).json({ error: 'Title is required' });
+    if (!title || !reportType) {
+      return res.status(400).json({ message: 'Title and report type are required.' });
+    }
+    if (!req.file) {
+      return res.status(400).json({ message: 'Report file is required.' });
+    }
+    const reportContent = await getTextFromBuffer(req.file.buffer, req.file.originalname);
+    if (!reportContent) {
+      return res.status(400).json({ message: 'Could not extract text from the uploaded file.' });
     }
 
-    let reportData = (manualReportData || '').trim();
-    let fileUrl;
-
-    if (uploadedFile) {
-      const extractedText = await extractTextFromFile(uploadedFile);
-
-      if (!extractedText) {
-        return res.status(400).json({
-          error: 'Unable to extract text from the uploaded file. Please upload a readable PDF, TXT, CSV, or JSON file.'
-        });
-      }
-
-      reportData = extractedText;
-      fileUrl = `/uploads/reports/${uploadedFile.filename}`;
-    }
-
-    if (!reportData) {
-      return res.status(400).json({ error: 'Report file is required' });
-    }
-
-    const report = new Report({
+    const newReport = new Report({
       userId,
       title,
       description,
       reportType,
-      fileUrl,
-      reportData,
-      status: 'pending'
+      reportData: reportContent,
     });
 
-    await report.save();
+    await newReport.save();
+
+    let cloudinaryResult;
+    try {
+      cloudinaryResult = await new Promise((resolve, reject) => {
+        const uploadStream = cloudinary.uploader.upload_stream(
+          {
+            folder: 'reports',
+            public_id: `report-${Date.now()}-${path.parse(req.file.originalname).name}`,
+            resource_type: 'raw', // Use 'raw' for non-image files like PDF/TXT
+          },
+          (error, result) => {
+            if (error) {
+              return reject(error);
+            }
+            resolve(result);
+          }
+        );
+        uploadStream.end(req.file.buffer);
+      });
+    } catch (uploadError) {
+      // Clean up the created report if Cloudinary upload fails
+      await Report.deleteOne({ _id: newReport._id });
+      throw new Error(`Cloudinary upload failed: ${uploadError.message}`);
+    }
+
+    newReport.fileUrl = cloudinaryResult.secure_url;
+    newReport.fileName = cloudinaryResult.public_id;
+    await newReport.save();
 
     res.status(201).json({
-      message: 'Report uploaded successfully',
-      report
+      message: 'Report uploaded and text extracted successfully!',
+      report: newReport,
     });
   } catch (error) {
-    console.error('Upload report error:', error);
-    res.status(error.statusCode || 500).json({ error: error.message || 'Failed to upload report' });
+    console.error('Error uploading report:', error);
+    res.status(500).json({ message: error.message || 'Server error while uploading report.' });
   }
 };
 
-const analyzeReport = async (req, res) => {
+export const getUserReports = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { status } = req.query;
+
+    const filter = { userId };
+    if (status) {
+      filter.status = status;
+    }
+
+    const reports = await Report.find(filter)
+      .sort({ createdAt: -1 })
+      .limit(50);
+
+    res.json(reports);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error while fetching reports.' });
+  }
+};
+
+export const getReport = async (req, res) => {
   try {
     const { reportId } = req.params;
     const userId = req.user._id;
@@ -197,6 +122,56 @@ const analyzeReport = async (req, res) => {
     const report = await Report.findOne({ _id: reportId, userId });
     if (!report) {
       return res.status(404).json({ error: 'Report not found' });
+    }
+
+    res.json(report);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+export const deleteReport = async (req, res) => {
+  try {
+    const { reportId } = req.params;
+    const userId = req.user._id || req.user.id;
+
+    const report = await Report.findOne({ _id: reportId, userId });
+
+    if (!report) {
+      return res.status(404).json({ message: 'Report not found.' });
+    }
+
+    // Delete from Cloudinary
+    if (report.fileName) {
+      // For 'raw' files, you need to specify the resource_type
+      await cloudinary.uploader.destroy(report.fileName, { resource_type: 'raw' });
+    }
+
+    await Report.deleteOne({ _id: reportId });
+
+    res.status(200).json({ message: 'Report deleted successfully.' });
+  } catch (error) {
+    console.error('Error deleting report:', error);
+    res.status(500).json({ message: 'Server error while deleting report.' });
+  }
+};
+
+export const analyzeReport = async (req, res) => {
+  try {
+    const { reportId } = req.params;
+    const userId = req.user._id || req.user.id;
+
+    const report = await Report.findOne({ _id: reportId, userId });
+
+    if (!report) {
+      return res.status(404).json({ message: 'Report not found.' });
+    }
+
+    // The reportData is already in the database
+    const reportContent = report.reportData;
+
+    if (!reportContent) {
+      return res.status(400).json({ message: 'Could not find content for the report.' });
     }
 
     let analysisText;
@@ -214,7 +189,7 @@ const analyzeReport = async (req, res) => {
             Report Type: ${report.reportType}
             Report Title: ${report.title}
             Report Data:
-            ${report.reportData}
+            ${reportContent}
 
             Provide your analysis in a structured format.`;
 
@@ -298,8 +273,23 @@ function extractBulletPoints(text, section) {
   return points.length > 0 ? points : ['Analysis completed. Please review the full summary.'];
 }
 
+function getMockAnalysis(report) {
+  return `This is a mock medical report analysis for ${report.title || 'the report'}. 
+Please note that this is an automated placeholder analysis and does not replace professional medical advice.
+
+Key Findings:
+- The uploaded report type is ${report.reportType || 'not specified'}.
+- No abnormal findings are detected in this simulated scan/text extraction.
+- The document has been successfully stored and indexed for reference.
+
+Recommendations:
+- Consult with your primary care physician to discuss the results in detail.
+- Keep a digital and physical copy of your medical records.
+- Follow up with any scheduled check-ups or routine screenings.`;
+}
+
 // Get user reports
-const getReports = async (req, res) => {
+export const getReports = async (req, res) => {
   try {
     const userId = req.user._id;
     const { status } = req.query;
@@ -319,52 +309,6 @@ const getReports = async (req, res) => {
   }
 };
 
-const getReport = async (req, res) => {
-  try {
-    const { reportId } = req.params;
-    const userId = req.user._id;
 
-    const report = await Report.findOne({ _id: reportId, userId });
-    if (!report) {
-      return res.status(404).json({ error: 'Report not found' });
-    }
 
-    res.json(report);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};
 
-// Delete report
-const deleteReport = async (req, res) => {
-  try {
-    const { reportId } = req.params;
-    const userId = req.user._id;
-
-    const report = await Report.findOne({ _id: reportId, userId });
-    if (!report) {
-      return res.status(404).json({ error: 'Report not found' });
-    }
-
-    if (report.fileUrl) {
-      const filePath = path.join(__dirname, '../../', report.fileUrl.replace(/^\//, ''));
-      await fs.unlink(filePath).catch(() => {
-        // Ignore file deletion errors to avoid blocking DB cleanup
-      });
-    }
-
-    await Report.deleteOne({ _id: reportId, userId });
-
-    res.json({ message: 'Report deleted successfully' });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};
-
-module.exports = {
-  uploadReport,
-  analyzeReport,
-  getReports,
-  getReport,
-  deleteReport
-};

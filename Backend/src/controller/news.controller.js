@@ -1,11 +1,11 @@
-const axios = require('axios');
+import axios from 'axios';
 
 // Get medical news
-const getNews = async (req, res) => {
+export const getNews = async (req, res) => {
   try {
     const { category = 'health', page = 1, pageSize = 20 } = req.query;
 
-    // Using NewsAPI.org - you'll need to sign up for a free API key
+    // Using NewsAPI.org 
     const NEWS_API_KEY = process.env.NEWS_API_KEY;
     
     if (!NEWS_API_KEY) {
@@ -44,7 +44,7 @@ const getNews = async (req, res) => {
 };
 
 // Search news
-const searchNews = async (req, res) => {
+export const searchNews = async (req, res) => {
   try {
     const { query, page = 1, pageSize = 20 } = req.query;
 
@@ -91,53 +91,5 @@ const searchNews = async (req, res) => {
   }
 };
 
-// Mock news data
-function getMockNews() {
-  return [
-    {
-      title: "New Breakthrough in Cancer Treatment Shows Promise",
-      description: "Researchers have discovered a new immunotherapy approach that shows significant promise in treating various types of cancer.",
-      url: "#",
-      urlToImage: "https://via.placeholder.com/400x250",
-      publishedAt: new Date().toISOString(),
-      source: { name: "Medical News Today" }
-    },
-    {
-      title: "AI-Powered Diagnosis Tools Improve Accuracy in Medical Imaging",
-      description: "Artificial intelligence is revolutionizing medical imaging with new tools that can detect diseases earlier and more accurately.",
-      url: "#",
-      urlToImage: "https://via.placeholder.com/400x250",
-      publishedAt: new Date(Date.now() - 86400000).toISOString(),
-      source: { name: "Health Tech Journal" }
-    },
-    {
-      title: "Understanding the Importance of Mental Health in Overall Wellness",
-      description: "Mental health professionals emphasize the crucial connection between mental and physical health.",
-      url: "#",
-      urlToImage: "https://via.placeholder.com/400x250",
-      publishedAt: new Date(Date.now() - 172800000).toISOString(),
-      source: { name: "Psychology Today" }
-    },
-    {
-      title: "New Guidelines for Heart Health Released by Medical Association",
-      description: "Updated cardiovascular health guidelines focus on prevention and early intervention strategies.",
-      url: "#",
-      urlToImage: "https://via.placeholder.com/400x250",
-      publishedAt: new Date(Date.now() - 259200000).toISOString(),
-      source: { name: "Cardiology News" }
-    },
-    {
-      title: "Advances in Telemedicine Transform Healthcare Access",
-      description: "Telemedicine continues to expand, making healthcare more accessible to remote and underserved populations.",
-      url: "#",
-      urlToImage: "https://via.placeholder.com/400x250",
-      publishedAt: new Date(Date.now() - 345600000).toISOString(),
-      source: { name: "Healthcare Innovation" }
-    }
-  ];
-}
 
-module.exports = {
-  getNews,
-  searchNews
-};
+

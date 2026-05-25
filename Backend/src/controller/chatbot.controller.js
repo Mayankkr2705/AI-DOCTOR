@@ -1,5 +1,5 @@
-const axios = require('axios');
-const ChatHistory = require('../models/ChatHistory');
+import axios from 'axios';
+import ChatHistory from '../models/ChatHistory.js';
 
 // Groq API configuration
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
@@ -103,8 +103,6 @@ const modePrompts = {
       nutrition, and general animal wellness. Always recommend consulting a licensed veterinarian 
       for diagnosis and treatment of animals.`
 };
-
-// Mock response generator when API is unavailable
 
 
 const chat = async (req, res) => {
@@ -352,7 +350,7 @@ Important:
   }
 };
 
-module.exports = {
+export{
   chat,
   getHistory,
   deleteConversation,

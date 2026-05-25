@@ -1,16 +1,20 @@
-const express = require('express');
-const cors = require('cors');
-const dotenv = require('dotenv');
-const mongoose = require('mongoose');
-const path = require('path');
-const multer = require('multer');
+import express from 'express';
+import cors from 'cors';
+import dotenv from 'dotenv';
+import mongoose from 'mongoose';
+import path from 'path';
+import multer from 'multer';
+import { fileURLToPath } from 'url';
 
 dotenv.config();
 
-const authRoutes = require('./routes/auth.routes');
-const chatbotRoutes = require('./routes/chatbot.routes');
-const reportRoutes = require('./routes/report.routes');
-const newsRoutes = require('./routes/news.routes');
+import authRoutes from './routes/auth.routes.js';
+import chatbotRoutes from './routes/chatbot.routes.js';
+import reportRoutes from './routes/report.routes.js';
+import newsRoutes from './routes/news.routes.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 
@@ -63,4 +67,4 @@ app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
 
-module.exports = app;
+export default app;

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { FileText, Upload, Loader, CheckCircle, XCircle, Eye } from 'lucide-react';
+import { FileText, Upload, Loader, CheckCircle2, AlertCircle, Eye, Trash2, XCircle, Rss, ClipboardList, Shield, Printer, Check, Info } from 'lucide-react';
 import { reportsAPI } from '../services/api';
 
 const ReportsPage = () => {
@@ -13,7 +13,7 @@ const ReportsPage = () => {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [reportType, setReportType] = useState('other');
-  const [reportData, setReportData] = useState('');
+  const [reportFile, setReportFile] = useState(null);
 
   const reportTypes = [
     { value: 'blood_test', label: 'Blood Test' },
@@ -41,30 +41,55 @@ const ReportsPage = () => {
 
   const handleUpload = async (e) => {
     e.preventDefault();
+
+    if (!reportFile) {
+      alert('Please select a report file to upload.');
+      return;
+    }
+
     setUploading(true);
 
     try {
-      await reportsAPI.uploadReport({
-        title,
-        description,
-        reportType,
-        reportData
-      });
+      const formData = new FormData();
+      formData.append('title', title);
+      formData.append('description', description);
+      formData.append('reportType', reportType);
+      formData.append('reportFile', reportFile);
+
+      await reportsAPI.uploadReport(formData);
 
       // Reset form
       setTitle('');
       setDescription('');
       setReportType('other');
-      setReportData('');
+      setReportFile(null);
       setShowUpload(false);
 
       // Reload reports
       loadReports();
     } catch (error) {
       console.error('Upload failed:', error);
-      alert('Failed to upload report. Please try again.');
+      const serverMessage = error?.response?.data?.message || error?.response?.data?.error;
+      alert(serverMessage || 'Failed to upload report. Please try again.');
     } finally {
       setUploading(false);
+    }
+  };
+
+  const handleDelete = async (reportId) => {
+    if (!window.confirm('Are you sure you want to delete this report? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      await reportsAPI.deleteReport(reportId);
+      setReports(prev => prev.filter(r => r._id !== reportId));
+      if (selectedReport?._id === reportId) {
+        setSelectedReport(null);
+      }
+    } catch (error) {
+      console.error('Failed to delete report:', error);
+      alert('Failed to delete report. Please try again.');
     }
   };
 
@@ -89,15 +114,15 @@ const ReportsPage = () => {
 
   const getStatusBadge = (status) => {
     const badges = {
-      pending: { bg: 'bg-yellow-100', text: 'text-yellow-800', label: 'Pending' },
-      analyzed: { bg: 'bg-green-100', text: 'text-green-800', label: 'Analyzed' },
-      reviewed: { bg: 'bg-blue-100', text: 'text-blue-800', label: 'Reviewed' }
+      pending: { bg: 'bg-amber-50 border-amber-200 text-amber-700', label: 'Pending Analysis' },
+      analyzed: { bg: 'bg-emerald-50 border-emerald-200 text-emerald-700', label: 'AI Analyzed' },
+      reviewed: { bg: 'bg-sky-50 border-sky-200 text-sky-700', label: 'Reviewed' }
     };
     
     const badge = badges[status] || badges.pending;
     
     return (
-      <span className={`px-2 py-1 text-xs font-semibold rounded-full ${badge.bg} ${badge.text}`}>
+      <span className={`px-2.5 py-0.5 text-[10px] font-bold rounded-full border ${badge.bg}`}>
         {badge.label}
       </span>
     );
@@ -105,99 +130,121 @@ const ReportsPage = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader className="h-12 w-12 animate-spin text-blue-600" />
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="text-center">
+          <Loader className="h-10 w-10 animate-spin text-teal-600 mx-auto mb-4" />
+          <p className="text-sm font-medium text-slate-500">Loading Clinical Reports...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold text-gray-900">Medical Reports</h1>
+    <div className="min-h-screen bg-slate-50 relative overflow-hidden py-8 font-sans">
+      {/* Glow Blur Orbs */}
+      <div className="absolute top-[5%] left-[-10%] w-[35%] h-[35%] bg-teal-400/5 rounded-full blur-[90px] pointer-events-none" />
+      <div className="absolute bottom-[5%] right-[-10%] w-[35%] h-[35%] bg-violet-400/5 rounded-full blur-[90px] pointer-events-none" />
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+        {/* Header Section */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+          <div>
+            <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
+              <ClipboardList className="h-8 w-8 text-teal-500" />
+              Medical Reports
+            </h1>
+            <p className="text-sm text-slate-500 mt-1">Upload and review diagnostic text extractions and AI reports.</p>
+          </div>
           <button
             onClick={() => setShowUpload(!showUpload)}
-            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition flex items-center space-x-2"
+            className="bg-gradient-to-tr from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white font-bold px-5 py-2.5 rounded-xl transition shadow-md shadow-teal-900/10 flex items-center gap-1.5"
           >
-            <Upload className="h-5 w-5" />
-            <span>Upload Report</span>
+            <Upload className="h-4 w-4" />
+            <span>Upload New File</span>
           </button>
         </div>
 
-        {/* Upload Form */}
+        {/* Upload Form Panel */}
         {showUpload && (
-          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-            <h2 className="text-xl font-semibold mb-4">Upload New Report</h2>
+          <div className="bg-white rounded-3xl shadow-md border border-slate-200/50 p-6 mb-8 animate-fade-in">
+            <h2 className="text-lg font-bold text-slate-900 mb-4">Upload Diagnostic Report</h2>
             <form onSubmit={handleUpload} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Report Title *
-                </label>
-                <input
-                  type="text"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  required
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="e.g., Blood Test - Jan 2026"
-                />
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-650 uppercase tracking-wider mb-1">
+                    Report Title *
+                  </label>
+                  <input
+                    type="text"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    required
+                    className="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 rounded-xl px-4 py-2.5 text-sm outline-none text-slate-800 transition"
+                    placeholder="e.g. Complete Blood Count - Jan 2026"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-650 uppercase tracking-wider mb-1">
+                    Report Type
+                  </label>
+                  <select
+                    value={reportType}
+                    onChange={(e) => setReportType(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 rounded-xl px-4 py-2.5 text-sm outline-none text-slate-850 transition"
+                  >
+                    {reportTypes.map(type => (
+                      <option key={type.value} value={type.value}>{type.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-bold text-slate-650 uppercase tracking-wider mb-1">
+                    Description
+                  </label>
+                  <textarea
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    rows="2"
+                    className="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 rounded-xl px-4 py-2.5 text-sm outline-none text-slate-800 transition resize-none"
+                    placeholder="Brief description of the diagnostic context or findings"
+                  />
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-bold text-slate-650 uppercase tracking-wider mb-2">
+                    Report File *
+                  </label>
+                  <div className="border-2 border-dashed border-slate-250 rounded-2xl p-6 bg-slate-50/50 hover:bg-slate-55 transition-colors relative flex flex-col items-center justify-center text-center">
+                    <input
+                      type="file"
+                      accept=".pdf,.txt,.csv,.json"
+                      required
+                      onChange={(e) => setReportFile(e.target.files?.[0] || null)}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    />
+                    <Upload className="h-8 w-8 text-slate-400 mb-2" />
+                    <p className="text-sm font-semibold text-slate-700">
+                      {reportFile ? reportFile.name : 'Click or Drag file here to choose'}
+                    </p>
+                    <p className="text-xs text-slate-400 mt-1">Supported: PDF, TXT, CSV, JSON (max 10MB)</p>
+                  </div>
+                </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Report Type
-                </label>
-                <select
-                  value={reportType}
-                  onChange={(e) => setReportType(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  {reportTypes.map(type => (
-                    <option key={type.value} value={type.value}>{type.label}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Description
-                </label>
-                <textarea
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  rows="2"
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Brief description of the report"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Report Data/Results *
-                </label>
-                <textarea
-                  value={reportData}
-                  onChange={(e) => setReportData(e.target.value)}
-                  required
-                  rows="6"
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Paste your report data, test results, or findings here..."
-                />
-              </div>
-
-              <div className="flex space-x-4">
+              <div className="flex gap-3 pt-2 border-t border-slate-100">
                 <button
                   type="submit"
                   disabled={uploading}
-                  className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition disabled:bg-gray-300"
+                  className="bg-gradient-to-tr from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white font-bold px-6 py-2.5 rounded-xl transition shadow-md shadow-teal-900/10 disabled:from-slate-200 disabled:to-slate-250 disabled:shadow-none disabled:cursor-not-allowed"
                 >
-                  {uploading ? 'Uploading...' : 'Upload Report'}
+                  {uploading ? 'Extracting & Saving...' : 'Upload & Process'}
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowUpload(false)}
-                  className="bg-gray-300 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-400 transition"
+                  className="bg-slate-100 hover:bg-slate-200 text-slate-750 font-bold px-6 py-2.5 rounded-xl transition border border-slate-200"
                 >
                   Cancel
                 </button>
@@ -206,55 +253,77 @@ const ReportsPage = () => {
           </div>
         )}
 
-        {/* Reports List */}
+        {/* Reports List Grid */}
         {reports.length === 0 ? (
-          <div className="bg-white rounded-lg shadow-md p-12 text-center">
-            <FileText className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-gray-700 mb-2">No Reports Yet</h3>
-            <p className="text-gray-500 mb-4">Upload your first medical report to get started</p>
+          <div className="bg-white rounded-3xl shadow-sm border border-slate-200/50 p-12 text-center max-w-xl mx-auto">
+            <FileText className="h-16 w-16 text-slate-350 mx-auto mb-4" />
+            <h3 className="text-xl font-bold text-slate-800 mb-2">No Reports Indexed</h3>
+            <p className="text-slate-505 text-sm mb-6 leading-relaxed">Upload a health scan or blood test PDF. Our system will immediately index its content in Mongoose and back up the document.</p>
             <button
               onClick={() => setShowUpload(true)}
-              className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition"
+              className="bg-gradient-to-tr from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white font-bold px-6 py-3 rounded-xl transition shadow-md shadow-teal-900/10"
             >
-              Upload Report
+              Upload Your First Report
             </button>
           </div>
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {reports.map((report) => (
-              <div key={report._id} className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition">
-                <div className="flex justify-between items-start mb-3">
-                  <h3 className="text-lg font-semibold text-gray-900 flex-1">
-                    {report.title}
-                  </h3>
-                  {getStatusBadge(report.status)}
+              <div key={report._id} className="group bg-white rounded-3xl shadow-sm p-6 border border-slate-200/50 hover:shadow-xl hover:shadow-slate-100 hover:border-slate-300 transition-all duration-300 transform hover:-translate-y-0.5 flex flex-col justify-between">
+                <div>
+                  <div className="flex justify-between items-start gap-2 mb-3">
+                    <h3 className="text-base font-bold text-slate-900 leading-snug group-hover:text-teal-700 transition-colors">
+                      {report.title}
+                    </h3>
+                    {getStatusBadge(report.status)}
+                  </div>
+                  
+                  {report.description && (
+                    <p className="text-xs text-slate-400 line-clamp-2 mb-4 leading-relaxed">
+                      {report.description}
+                    </p>
+                  )}
+                  
+                  <div className="space-y-1 text-xs text-slate-500 mb-6">
+                    <p>
+                      Type:{' '}
+                      <span className="font-semibold text-slate-700 capitalize">
+                        {report.reportType.replace('_', ' ')}
+                      </span>
+                    </p>
+                    <p>
+                      Indexed:{' '}
+                      <span className="font-semibold text-slate-700">
+                        {new Date(report.createdAt).toLocaleDateString()}
+                      </span>
+                    </p>
+                  </div>
                 </div>
-                
-                <p className="text-sm text-gray-600 mb-2">
-                  Type: <span className="font-medium">{report.reportType.replace('_', ' ')}</span>
-                </p>
-                
-                <p className="text-sm text-gray-500 mb-4">
-                  {new Date(report.createdAt).toLocaleDateString()}
-                </p>
 
-                <div className="flex space-x-2">
+                <div className="flex gap-2 pt-3 border-t border-slate-100">
                   <button
                     onClick={() => setSelectedReport(report)}
-                    className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition text-sm flex items-center justify-center space-x-1"
+                    className="flex-1 bg-slate-900 hover:bg-slate-800 text-white px-3 py-2 rounded-xl transition text-xs font-bold flex items-center justify-center gap-1 shadow-sm"
                   >
-                    <Eye className="h-4 w-4" />
+                    <Eye className="h-3.5 w-3.5" />
                     <span>View</span>
                   </button>
                   
                   {report.status === 'pending' && (
                     <button
                       onClick={() => handleAnalyze(report._id)}
-                      className="flex-1 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition text-sm"
+                      className="flex-1 bg-gradient-to-tr from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white px-3 py-2 rounded-xl transition text-xs font-bold"
                     >
                       Analyze
                     </button>
                   )}
+                  <button
+                    onClick={() => handleDelete(report._id)}
+                    className="bg-rose-50 hover:bg-rose-100 border border-rose-100 text-rose-600 p-2 rounded-xl transition"
+                    title="Delete Report"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
                 </div>
               </div>
             ))}
@@ -263,62 +332,85 @@ const ReportsPage = () => {
 
         {/* Report Detail Modal */}
         {selectedReport && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto">
-              <div className="sticky top-0 bg-white border-b p-6 flex justify-between items-center">
-                <h2 className="text-2xl font-bold">{selectedReport.title}</h2>
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fade-in">
+            <div className="bg-white rounded-3xl max-w-3xl w-full max-h-[90vh] overflow-y-auto border border-slate-200/50 shadow-2xl">
+              {/* Header */}
+              <div className="sticky top-0 bg-white border-b border-slate-100 p-6 flex justify-between items-center z-10">
+                <div>
+                  <h2 className="text-xl font-bold text-slate-950">{selectedReport.title}</h2>
+                  <div className="flex items-center gap-2 mt-1.5">
+                    {getStatusBadge(selectedReport.status)}
+                    <span className="text-[10px] text-slate-400">
+                      Indexed: {new Date(selectedReport.createdAt).toLocaleDateString()}
+                    </span>
+                  </div>
+                </div>
                 <button
                   onClick={() => setSelectedReport(null)}
-                  className="text-gray-500 hover:text-gray-700"
+                  className="text-slate-400 hover:text-slate-600 bg-slate-50 hover:bg-slate-100 p-2 rounded-full transition"
                 >
                   <XCircle className="h-6 w-6" />
                 </button>
               </div>
               
+              {/* Content Body */}
               <div className="p-6 space-y-6">
-                <div>
-                  <p className="text-sm text-gray-600">
-                    Type: <span className="font-medium">{selectedReport.reportType.replace('_', ' ')}</span>
-                  </p>
-                  <p className="text-sm text-gray-600">
-                    Status: {getStatusBadge(selectedReport.status)}
-                  </p>
-                  <p className="text-sm text-gray-600">
-                    Date: {new Date(selectedReport.createdAt).toLocaleDateString()}
-                  </p>
-                </div>
-
                 {selectedReport.description && (
                   <div>
-                    <h3 className="font-semibold mb-2">Description</h3>
-                    <p className="text-gray-700">{selectedReport.description}</p>
+                    <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Description</h3>
+                    <p className="text-sm text-slate-800 bg-slate-50 rounded-2xl p-4 leading-relaxed border border-slate-200/20">{selectedReport.description}</p>
                   </div>
                 )}
 
+                {/* Extracted Text */}
                 <div>
-                  <h3 className="font-semibold mb-2">Report Data</h3>
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <pre className="whitespace-pre-wrap text-sm text-gray-700">
-                      {selectedReport.reportData}
-                    </pre>
+                  <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Extracted Report Text</h3>
+                  <div className="bg-slate-950 text-emerald-400 font-mono rounded-2xl p-4 overflow-x-auto text-xs leading-relaxed max-h-60 border border-slate-800">
+                    <pre className="whitespace-pre-wrap">{selectedReport.reportData}</pre>
                   </div>
                 </div>
 
+                {/* Cloudinary Link */}
+                {selectedReport.fileUrl && (
+                  <div className="flex items-center gap-2 bg-slate-50 px-4 py-3 rounded-2xl border border-slate-200/20 text-xs">
+                    <Shield className="h-4 w-4 text-teal-600 flex-shrink-0" />
+                    <p className="text-slate-650">
+                      Document backed up securely to Cloudinary:{' '}
+                      <a 
+                        href={selectedReport.fileUrl} 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className="text-teal-600 hover:underline font-semibold"
+                      >
+                        [Download Original File]
+                      </a>
+                    </p>
+                  </div>
+                )}
+
+                {/* AI Analysis Result */}
                 {selectedReport.analysis && (
-                  <div className="bg-blue-50 p-6 rounded-lg">
-                    <h3 className="font-semibold text-lg mb-4 text-blue-900">AI Analysis</h3>
+                  <div className="bg-gradient-to-br from-teal-50/50 via-teal-50/30 to-cyan-50/10 border border-teal-200/50 rounded-3xl p-6 relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-24 h-24 bg-teal-500/5 rounded-full blur-2xl pointer-events-none" />
+                    <h3 className="font-bold text-base text-teal-900 mb-4 flex items-center gap-1.5">
+                      <CheckCircle2 className="h-5 w-5 text-teal-600 fill-teal-100" />
+                      Diagnostic AI Analysis
+                    </h3>
                     
-                    <div className="mb-4">
-                      <h4 className="font-semibold text-blue-800 mb-2">Summary</h4>
-                      <p className="text-gray-700">{selectedReport.analysis.summary}</p>
+                    <div className="mb-5">
+                      <h4 className="text-xs font-bold text-teal-800 uppercase tracking-wider mb-1.5">Report Summary</h4>
+                      <p className="text-sm text-slate-700 leading-relaxed bg-white/60 backdrop-blur-sm rounded-xl p-3 border border-teal-200/10">{selectedReport.analysis.summary}</p>
                     </div>
 
                     {selectedReport.analysis.findings?.length > 0 && (
-                      <div className="mb-4">
-                        <h4 className="font-semibold text-blue-800 mb-2">Key Findings</h4>
-                        <ul className="list-disc list-inside space-y-1">
+                      <div className="mb-5">
+                        <h4 className="text-xs font-bold text-teal-800 uppercase tracking-wider mb-1.5">Key Findings</h4>
+                        <ul className="space-y-1.5">
                           {selectedReport.analysis.findings.map((finding, i) => (
-                            <li key={i} className="text-gray-700">{finding}</li>
+                            <li key={i} className="text-sm text-slate-700 flex items-start gap-1.5">
+                              <Check className="h-4 w-4 text-emerald-600 flex-shrink-0 mt-0.5" />
+                              <span>{finding}</span>
+                            </li>
                           ))}
                         </ul>
                       </div>
@@ -326,10 +418,13 @@ const ReportsPage = () => {
 
                     {selectedReport.analysis.recommendations?.length > 0 && (
                       <div>
-                        <h4 className="font-semibold text-blue-800 mb-2">Recommendations</h4>
-                        <ul className="list-disc list-inside space-y-1">
+                        <h4 className="text-xs font-bold text-teal-800 uppercase tracking-wider mb-1.5">Recommendations</h4>
+                        <ul className="space-y-1.5">
                           {selectedReport.analysis.recommendations.map((rec, i) => (
-                            <li key={i} className="text-gray-700">{rec}</li>
+                            <li key={i} className="text-sm text-slate-700 flex items-start gap-1.5">
+                              <Info className="h-4 w-4 text-teal-600 flex-shrink-0 mt-0.5" />
+                              <span>{rec}</span>
+                            </li>
                           ))}
                         </ul>
                       </div>
@@ -337,16 +432,27 @@ const ReportsPage = () => {
                   </div>
                 )}
 
-                {selectedReport.status === 'pending' && (
+                {/* Footer Buttons */}
+                <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                  {selectedReport.status === 'pending' && (
+                    <button
+                      onClick={() => {
+                        handleAnalyze(selectedReport._id);
+                      }}
+                      className="flex-1 bg-gradient-to-tr from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white font-bold px-6 py-3.5 rounded-2xl transition shadow-md shadow-teal-900/10 flex items-center justify-center gap-1.5"
+                    >
+                      <Bot className="h-5 w-5" />
+                      <span>Analyze with AI</span>
+                    </button>
+                  )}
                   <button
-                    onClick={() => {
-                      handleAnalyze(selectedReport._id);
-                    }}
-                    className="w-full bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition"
+                    onClick={() => handleDelete(selectedReport._id)}
+                    className="flex-1 bg-rose-600 hover:bg-rose-700 text-white font-bold px-6 py-3.5 rounded-2xl transition shadow-md shadow-rose-900/10 flex items-center justify-center gap-1.5"
                   >
-                    Analyze with AI
+                    <Trash2 className="h-5 w-5" />
+                    <span>Delete Report</span>
                   </button>
-                )}
+                </div>
               </div>
             </div>
           </div>

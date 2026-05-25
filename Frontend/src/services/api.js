@@ -24,13 +24,18 @@ export const chatAPI = {
   deleteConversation: async (conversationId) => {
     const response = await axios.delete(`${API_URL}/chatbot/history/${conversationId}`);
     return response.data;
+  },
+
+  analyzeHealthScore: async (assessmentData) => {
+    const response = await axios.post(`${API_URL}/chatbot/health-score`, assessmentData);
+    return response.data;
   }
 };
 
 // Reports API
 export const reportsAPI = {
-  uploadReport: async (reportData) => {
-    const response = await axios.post(`${API_URL}/reports/upload`, reportData);
+  uploadReport: async (payload) => {
+    const response = await axios.post(`${API_URL}/reports/upload`, payload);
     return response.data;
   },
 

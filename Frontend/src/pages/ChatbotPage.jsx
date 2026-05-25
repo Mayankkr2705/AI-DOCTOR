@@ -1,13 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
-import { Send, Bot, User, Loader } from 'lucide-react';
+import { Send, Bot, User, Loader, Sparkles, AlertCircle, Info } from 'lucide-react';
 import { chatAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
 const MODES = [
-  { id: 'child', name: 'Pediatric Care', emoji: '👶', color: 'bg-blue-500' },
-  { id: 'adult', name: 'Adult Healthcare', emoji: '👨‍⚕️', color: 'bg-green-500' },
-  { id: 'female', name: "Women's Health", emoji: '👩‍⚕️', color: 'bg-pink-500' },
-  { id: 'animal', name: 'Veterinary Care', emoji: '🐾', color: 'bg-orange-500' }
+  { id: 'child', name: 'Pediatric Care', emoji: '👶', color: 'bg-blue-500', text: 'text-blue-500', hover: 'hover:border-blue-500/30' },
+  { id: 'adult', name: 'Adult Healthcare', emoji: '👨‍⚕️', color: 'bg-emerald-500', text: 'text-emerald-500', hover: 'hover:border-emerald-500/30' },
+  { id: 'female', name: "Women's Health", emoji: '👩‍⚕️', color: 'bg-pink-500', text: 'text-pink-500', hover: 'hover:border-pink-500/30' },
+  { id: 'animal', name: 'Veterinary Care', emoji: '🐾', color: 'bg-amber-500', text: 'text-amber-500', hover: 'hover:border-amber-500/30' }
 ];
 
 // Guest mode responses
@@ -117,11 +117,13 @@ const ChatbotPage = () => {
   const { isGuest } = useAuth();
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
   useEffect(() => {
-    scrollToBottom();
+    if (messages.length) {
+      scrollToBottom();
+    }
   }, [messages]);
 
   // Load guest messages from localStorage
@@ -144,6 +146,12 @@ const ChatbotPage = () => {
       role: 'assistant',
       content: `Hello! I'm your ${selectedMode.name} assistant ${selectedMode.emoji}. How can I help you today?`
     }]);
+    
+    // Scroll to top when mode changes
+    const chatContainer = document.querySelector('.overflow-y-auto');
+    if (chatContainer) {
+      chatContainer.scrollTop = 0;
+    }
   }, [mode, isGuest]);
 
   // Save guest messages to localStorage
@@ -209,69 +217,100 @@ const ChatbotPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Mode Selection */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <h2 className="text-xl font-semibold mb-4">Select Consultation Mode</h2>
+    <div className="min-h-screen bg-slate-50 relative overflow-hidden py-8 font-sans">
+      {/* Glow Blur Orbs */}
+      <div className="absolute top-[5%] left-[-10%] w-[35%] h-[35%] bg-teal-400/5 rounded-full blur-[90px] pointer-events-none" />
+      <div className="absolute bottom-[5%] right-[-10%] w-[35%] h-[35%] bg-violet-400/5 rounded-full blur-[90px] pointer-events-none" />
+
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+        {/* Mode Selection Card */}
+        <div className="bg-white rounded-3xl shadow-sm p-6 mb-6 border border-slate-200/50">
+          <h2 className="text-xl font-bold text-slate-900 mb-4 flex items-center gap-1.5">
+            <Sparkles className="h-5 w-5 text-teal-500" />
+            Select Consultation Profile
+          </h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {MODES.map((m) => (
-              <button
-                key={m.id}
-                onClick={() => setMode(m.id)}
-                className={`p-4 rounded-lg border-2 transition ${
-                  mode === m.id
-                    ? `${m.color} text-white border-transparent`
-                    : 'bg-white text-gray-700 border-gray-300 hover:border-gray-400'
-                }`}
-              >
-                <div className="text-3xl mb-2">{m.emoji}</div>
-                <div className="font-semibold text-sm">{m.name}</div>
-              </button>
-            ))}
+            {MODES.map((m) => {
+              const isActive = mode === m.id;
+              return (
+                <button
+                  key={m.id}
+                  onClick={() => setMode(m.id)}
+                  className={`group p-5 rounded-2xl border-2 text-center transition-all duration-300 transform hover:-translate-y-0.5 ${
+                    isActive
+                      ? `${m.color} text-white border-transparent shadow-lg shadow-teal-500/10`
+                      : `bg-white text-slate-700 border-slate-200 ${m.hover} hover:shadow-md hover:bg-slate-50/50`
+                  }`}
+                >
+                  <div className={`text-4xl mb-2 transition-transform duration-300 ${isActive ? 'scale-110' : 'group-hover:scale-110'}`}>{m.emoji}</div>
+                  <div className="font-bold text-xs sm:text-sm tracking-wide">{m.name}</div>
+                </button>
+              );
+            })}
           </div>
         </div>
 
         {/* Chat Container */}
-        <div className="bg-white rounded-lg shadow-md flex flex-col" style={{ height: '600px' }}>
-          {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-6 space-y-4">
-            {messages.map((message, index) => (
-              <div
-                key={index}
-                className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-              >
-                <div className={`flex items-start space-x-2 max-w-xl ${
-                  message.role === 'user' ? 'flex-row-reverse space-x-reverse' : ''
-                }`}>
-                  <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
-                    message.role === 'user' ? 'bg-blue-600' : 'bg-gray-300'
-                  }`}>
-                    {message.role === 'user' ? (
-                      <User className="h-5 w-5 text-white" />
-                    ) : (
-                      <Bot className="h-5 w-5 text-gray-700" />
-                    )}
-                  </div>
-                  <div className={`rounded-lg px-4 py-2 ${
-                    message.role === 'user'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 text-gray-900'
-                  }`}>
-                    <p className="whitespace-pre-wrap">{message.content}</p>
+        <div className="bg-white rounded-3xl shadow-md border border-slate-200/50 flex flex-col overflow-hidden" style={{ height: '620px' }}>
+          {/* Header */}
+          <div className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between border-b border-slate-800">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 rounded-full bg-teal-500/20 border border-teal-500/30 flex items-center justify-center">
+                <Bot className="h-5 w-5 text-teal-400" />
+              </div>
+              <div>
+                <h3 className="font-bold text-sm tracking-wide">
+                  {MODES.find(m => m.id === mode).name} Bot
+                </h3>
+                <span className="text-[10px] text-teal-400 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse" />
+                  AI Clinical Consultation Active
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Messages Area */}
+          <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-slate-50/50">
+            {messages.map((message, index) => {
+              const isUser = message.role === 'user';
+              return (
+                <div
+                  key={index}
+                  className={`flex ${isUser ? 'justify-end' : 'justify-start'} animate-fade-in`}
+                >
+                  <div className={`flex items-start space-x-2 max-w-xl ${isUser ? 'flex-row-reverse space-x-reverse' : ''}`}>
+                    {/* Icon */}
+                    <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center shadow-sm ${
+                      isUser ? 'bg-gradient-to-tr from-teal-600 to-emerald-600' : 'bg-white border border-slate-200'
+                    }`}>
+                      {isUser ? (
+                        <User className="h-4 w-4 text-white" />
+                      ) : (
+                        <Bot className="h-4 w-4 text-slate-700" />
+                      )}
+                    </div>
+                    {/* Bubble */}
+                    <div className={`rounded-2xl px-4 py-2.5 text-sm leading-relaxed shadow-sm ${
+                      isUser
+                        ? 'bg-gradient-to-tr from-teal-600 to-emerald-600 text-white rounded-tr-none'
+                        : 'bg-white text-slate-800 border border-slate-200/50 rounded-tl-none'
+                    }`}>
+                      <p className="whitespace-pre-wrap">{message.content}</p>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
             
             {loading && (
               <div className="flex justify-start">
                 <div className="flex items-center space-x-2">
-                  <div className="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center">
-                    <Bot className="h-5 w-5 text-gray-700" />
+                  <div className="w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center shadow-sm">
+                    <Bot className="h-4 w-4 text-slate-700" />
                   </div>
-                  <div className="bg-gray-100 rounded-lg px-4 py-2">
-                    <Loader className="h-5 w-5 animate-spin text-gray-600" />
+                  <div className="bg-white border border-slate-200 rounded-2xl rounded-tl-none px-4 py-3 flex items-center shadow-sm">
+                    <Loader className="h-4 w-4 animate-spin text-teal-600" />
                   </div>
                 </div>
               </div>
@@ -281,34 +320,33 @@ const ChatbotPage = () => {
           </div>
 
           {/* Input Area */}
-          <div className="border-t p-4">
+          <div className="border-t border-slate-100 p-4 bg-white">
             <div className="flex space-x-2">
               <textarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyPress={handleKeyPress}
-                placeholder="Type your message..."
-                className="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                rows="2"
+                placeholder={`Ask ${MODES.find(m => m.id === mode).name} anything...`}
+                className="flex-1 border border-slate-200 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 rounded-2xl px-4 py-2.5 text-sm outline-none resize-none bg-slate-50 transition min-h-[46px] max-h-[120px]"
+                rows="1"
                 disabled={loading}
               />
               <button
                 onClick={handleSend}
                 disabled={loading || !input.trim()}
-                className="bg-blue-600 text-white px-6 rounded-lg hover:bg-blue-700 transition disabled:bg-gray-300 disabled:cursor-not-allowed"
+                className="bg-gradient-to-tr from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white px-5 rounded-2xl transition-all duration-200 shadow-md shadow-teal-900/10 hover:shadow-teal-950/20 disabled:from-slate-200 disabled:to-slate-250 disabled:shadow-none disabled:cursor-not-allowed flex items-center justify-center"
               >
-                <Send className="h-5 w-5" />
+                <Send className="h-4 w-4" />
               </button>
             </div>
           </div>
         </div>
 
-        {/* Disclaimer */}
-        <div className="mt-6 bg-yellow-50 border-l-4 border-yellow-500 p-4 rounded-r-lg">
-          <p className="text-sm text-yellow-800">
-            <strong>⚠️ Medical Disclaimer:</strong> This AI chatbot provides general health information only. 
-            It is not a substitute for professional medical advice, diagnosis, or treatment. 
-            Always consult with qualified healthcare professionals for medical concerns.
+        {/* Disclaimer Alert Box */}
+        <div className="mt-6 bg-gradient-to-r from-amber-50/50 to-slate-100/10 border-l-4 border-amber-500 p-4 rounded-r-2xl border border-amber-100/50 flex gap-3">
+          <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+          <p className="text-xs text-amber-800 leading-relaxed">
+            <strong>Medical Disclaimer:</strong> This clinical AI chatbot provides general educational references. It does not replace formal diagnoses, physical checks, or healthcare provider prescriptions. Always seek immediate clinical guidance for symptoms or emergency care.
           </p>
         </div>
       </div>

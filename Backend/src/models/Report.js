@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
 const reportSchema = new mongoose.Schema({
   userId: {
@@ -19,6 +19,9 @@ const reportSchema = new mongoose.Schema({
     default: 'other'
   },
   fileUrl: {
+    type: String
+  },
+  fileName: {
     type: String
   },
   reportData: {
@@ -42,4 +45,4 @@ const reportSchema = new mongoose.Schema({
   }
 });
 
-module.exports = mongoose.model('Report', reportSchema);
+export default mongoose.model('Report', reportSchema);

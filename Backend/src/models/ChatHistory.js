@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
 const chatHistorySchema = new mongoose.Schema({
   userId: {
@@ -36,4 +36,4 @@ const chatHistorySchema = new mongoose.Schema({
   }
 });
 
-module.exports = mongoose.model('ChatHistory', chatHistorySchema);
+export default mongoose.model('ChatHistory', chatHistorySchema);
