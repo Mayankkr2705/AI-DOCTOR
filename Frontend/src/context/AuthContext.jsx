@@ -86,6 +86,46 @@ export const AuthProvider = ({ children }) => {
     return { success: true };
   };
 
+  const updateProfile = async (name, email, password) => {
+    try {
+      const data = await authAPI.updateProfile(name, email, password);
+      setUser(data.user);
+      return { success: true };
+    } catch (error) {
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Profile update failed. Please try again.'
+      };
+    }
+  };
+
+  const deleteProfile = async () => {
+    try {
+      await authAPI.deleteProfile();
+      logout();
+      return { success: true };
+    } catch (error) {
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Account deletion failed. Please try again.'
+      };
+    }
+  };
+
+  const loginWithGoogle = async (googleToken) => {
+    try {
+      const data = await authAPI.googleLogin(googleToken);
+      setToken(data.token);
+      setUser(data.user);
+      return { success: true };
+    } catch (error) {
+      return { 
+        success: false, 
+        error: error.response?.data?.error || 'Google login failed. Please try again.' 
+      };
+    }
+  };
+
   const value = {
     user,
     loading,
@@ -93,6 +133,9 @@ export const AuthProvider = ({ children }) => {
     register,
     logout,
     loginAsGuest,
+    updateProfile,
+    deleteProfile,
+    loginWithGoogle,
     isAuthenticated: !!user,
     isGuest: localStorage.getItem('isGuest') === 'true'
   };

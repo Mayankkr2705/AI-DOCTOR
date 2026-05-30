@@ -53,10 +53,14 @@ const Navbar = () => {
             <div className="flex items-center space-x-3 ml-2 lg:ml-4 pl-2 lg:pl-4 border-l border-white/10">
               {user ? (
                 <>
-                  <span className="text-teal-100 flex items-center bg-white/5 py-1 px-3 rounded-full border border-teal-500/20 text-sm">
+                  <Link 
+                    to="/profile" 
+                    className="text-teal-100 flex items-center bg-white/5 hover:bg-teal-500/10 hover:text-white py-1 px-3 rounded-full border border-teal-500/20 text-sm transition-colors duration-200"
+                    title="Edit Profile"
+                  >
                     <UserCircle className="h-4 w-4 mr-1.5 text-teal-300" />
                     <span className="hidden lg:inline max-w-[100px] truncate">{user.name}</span>
-                  </span>
+                  </Link>
                   <button
                     onClick={handleSignOut}
                     className="flex items-center space-x-1.5 text-white/80 hover:text-rose-400 hover:bg-rose-500/10 px-3 py-1.5 rounded-lg transition-all duration-200"
@@ -151,10 +155,14 @@ const Navbar = () => {
             </Link>
             {user ? (
               <>
-                <div className="px-3 py-2 text-teal-200 flex items-center space-x-2 border-t border-teal-500/20 mt-2 pt-2">
+                <Link
+                  to="/profile"
+                  className="px-3 py-2 text-teal-200 flex items-center space-x-2 border-t border-teal-500/20 mt-2 pt-2 hover:bg-white/5 rounded-lg transition"
+                  onClick={() => setIsOpen(false)}
+                >
                   <UserCircle className="h-5 w-5 text-teal-400" />
                   <span>{user.name}</span>
-                </div>
+                </Link>
                 <button
                   onClick={() => {
                     setIsOpen(false);

@@ -85,8 +85,124 @@ const getCurrentUser = async (req, res) => {
   }
 };
 
+// Update User
+const updateUser = async (req, res) => {
+  try {
+    const { name, email, password } = req.body;
+    const user = await User.findById(req.user._id);
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    if (name) user.name = name;
+    if (email) {
+      const existingUser = await User.findOne({ email });
+      if (existingUser && existingUser._id.toString() !== user._id.toString()) {
+        return res.status(400).json({ error: 'Email is already in use' });
+      }
+      user.email = email;
+    }
+    
+    if (password) {
+      if (password.length < 6) {
+        return res.status(400).json({ error: 'Password must be at least 6 characters' });
+      }
+      user.password = password;
+    }
+
+    await user.save();
+
+    res.json({
+      message: 'User updated successfully',
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// Delete User
+const deleteUser = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    await User.findByIdAndDelete(req.user._id);
+    res.json({ message: 'User deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// Google OAuth Login
+const googleLogin = async (req, res) => {
+  try {
+    const { token } = req.body;
+
+    if (!token) {
+      return res.status(400).json({ error: 'Google ID token is required' });
+    }
+
+    // Verify token with Google's API
+    const response = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${token}`);
+    if (!response.ok) {
+      return res.status(400).json({ error: 'Invalid Google token' });
+    }
+
+    const payload = await response.json();
+    
+    const { email, name, sub: googleId } = payload;
+
+    let user = await User.findOne({ googleId });
+
+    if (!user) {
+      // 2. If not found, check by email
+      user = await User.findOne({ email: email.toLowerCase() });
+
+      if (user) {
+        // Link googleId to existing user account
+        user.googleId = googleId;
+        await user.save();
+      } else {
+        // Create new user (password is not required since googleId is present)
+        user = new User({
+          name: name || email.split('@')[0],
+          email: email.toLowerCase(),
+          googleId
+        });
+        await user.save();
+      }
+    }
+
+    // Generate token
+    const appToken = generateToken(user._id);
+
+    res.json({
+      message: 'Google login successful',
+      token: appToken,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
 export {
   register,
   login,
-  getCurrentUser
+  getCurrentUser,
+  updateUser,
+  deleteUser,
+  googleLogin
 };

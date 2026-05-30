@@ -10,6 +10,7 @@ import Dashboard from './pages/Dashboard';
 import ChatbotPage from './pages/ChatbotPage';
 import ReportsPage from './pages/ReportsPage';
 import NewsPage from './pages/NewsPage';
+import ProfilePage from './pages/ProfilePage';
 
 
 function App() {
@@ -52,6 +53,14 @@ function App() {
                 element={
                   <ProtectedRoute>
                     <NewsPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/profile"
+                element={
+                  <ProtectedRoute>
+                    <ProfilePage />
                   </ProtectedRoute>
                 }
               />

@@ -98,6 +98,22 @@ export const authAPI = {
   getcurr:async()=>{
     const response = await axios.get(`${API_URL}/auth/me`);
     return response.data;
+  },
+  googleLogin: async (token) => {
+    const response = await axios.post(`${API_URL}/auth/google`, { token });
+    return response.data;
+  },
+  updateProfile: async (name, email, password) => {
+    const response = await axios.put(`${API_URL}/auth/me`,{
+      name,
+      email,
+      password
+    });
+    return response.data;
+  },
+  deleteProfile: async () => {
+    const response = await axios.delete(`${API_URL}/auth/me`);
+    return response.data;
   }
 }
 

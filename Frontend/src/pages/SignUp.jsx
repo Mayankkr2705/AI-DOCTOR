@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { 
@@ -26,8 +26,38 @@ const SignUp = () => {
   const [loading, setLoading] = useState(false);
   const [focusedField, setFocusedField] = useState(null);
   
-  const { register, loginAsGuest } = useAuth();
+  const { register, loginAsGuest, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
+
+  const handleGoogleCallback = async (response) => {
+    setError('');
+    setLoading(true);
+    const result = await loginWithGoogle(response.credential);
+    if (result.success) {
+      navigate('/dashboard');
+    } else {
+      setError(result.error);
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    if (window.google) {
+      try {
+        window.google.accounts.id.initialize({
+          client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID || "180293113941-mockid.apps.googleusercontent.com",
+          callback: handleGoogleCallback,
+        });
+
+        window.google.accounts.id.renderButton(
+          document.getElementById("googleBtn"),
+          { theme: "outline", size: "large", text: "signup_with" }
+        );
+      } catch (err) {
+        console.error("Google accounts SDK failed to load:", err);
+      }
+    }
+  }, []);
 
   // Password strength checker
   const getPasswordStrength = (pass) => {
@@ -363,6 +393,12 @@ const SignUp = () => {
                       )}
                     </button>
                   </form>
+
+                  {/* Google OAuth SignUp Button */}
+                  <div className="mt-5 pt-4 border-t border-slate-100/60 flex flex-col items-center">
+                    <span className="text-[10px] text-slate-400 mb-3 uppercase font-bold tracking-wider">Or register using</span>
+                    <div id="googleBtn" className="w-full flex justify-center min-h-[40px]"></div>
+                  </div>
 
                   {/* Sign In Link */}
                   <p className="mt-6 text-center text-sm text-slate-500">
