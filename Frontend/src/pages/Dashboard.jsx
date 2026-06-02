@@ -1,13 +1,14 @@
 import { Link } from 'react-router-dom';
 import { useEffect, useState } from 'react';
-import { Bot, FileBarChart, Rss, Sparkles, HeartPulse, ShieldAlert, ArrowRight, UserCircle, Calendar, Star } from 'lucide-react';
+import { Bot, FileBarChart, Rss, Sparkles, HeartPulse, ShieldAlert, ArrowRight, UserCircle, Calendar, Star, Pill } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { chatAPI, reportsAPI } from '../services/api';
+import { chatAPI, reportsAPI, medicationAPI } from '../services/api';
 
 const Dashboard = () => {
   const { user } = useAuth();
   const [conversationCount, setConversationCount] = useState(0);
   const [reportCount, setReportCount] = useState(0);
+  const [medicationCount, setMedicationCount] = useState(0);
   const [showHealthForm, setShowHealthForm] = useState(false);
   const [isAnalyzingHealth, setIsAnalyzingHealth] = useState(false);
   const [showHealthDetails, setShowHealthDetails] = useState(false);
@@ -95,17 +96,20 @@ const Dashboard = () => {
   useEffect(() => {
     const loadStats = async () => {
       try {
-        const [conversations, reports] = await Promise.all([
+        const [conversations, reports, medications] = await Promise.all([
           chatAPI.getHistory(),
-          reportsAPI.getReports()
+          reportsAPI.getReports(),
+          medicationAPI.getMedications()
         ]);
 
         setConversationCount(Array.isArray(conversations) ? conversations.length : 0);
         setReportCount(Array.isArray(reports) ? reports.length : 0);
+        setMedicationCount(Array.isArray(medications) ? medications.length : 0);
       } catch (error) {
         console.error('Failed to load dashboard stats:', error);
         setConversationCount(0);
         setReportCount(0);
+        setMedicationCount(0);
       }
     };
 
@@ -190,6 +194,14 @@ const Dashboard = () => {
       shadow: 'shadow-purple-500/10 hover:border-purple-500/20'
     },
     {
+      title: 'Medication Tracker',
+      description: 'Manage prescriptions and set daily reminders',
+      icon: Pill,
+      link: '/medications',
+      gradient: 'from-blue-500 to-indigo-600',
+      shadow: 'shadow-blue-500/10 hover:border-blue-500/20'
+    },
+    {
       title: 'Medical Reports',
       description: 'Upload reports and files for smart AI extraction',
       icon: FileBarChart,
@@ -226,7 +238,7 @@ const Dashboard = () => {
         </div>
 
         {/* Quick Stats Grid */}
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           {/* Card 1 - Chats */}
           <div className="bg-white rounded-3xl shadow-sm p-6 border border-slate-200/50 hover:shadow-xl hover:shadow-slate-100 hover:border-purple-500/20 transition-all duration-300 transform hover:-translate-y-0.5">
             <div className="flex items-center justify-between">
@@ -247,7 +259,27 @@ const Dashboard = () => {
             </div>
           </div>
 
-          {/* Card 2 - Reports */}
+          {/* Card 2 - Medications */}
+          <div className="bg-white rounded-3xl shadow-sm p-6 border border-slate-200/50 hover:shadow-xl hover:shadow-slate-100 hover:border-blue-500/20 transition-all duration-300 transform hover:-translate-y-0.5">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-1">Medications</p>
+                <p className="text-3xl font-extrabold text-slate-800">{medicationCount}</p>
+              </div>
+              <div className="bg-blue-50 p-3 rounded-2xl border border-blue-100">
+                <Pill className="h-7 w-7 text-blue-600" />
+              </div>
+            </div>
+            <div className="mt-4 pt-3 border-t border-slate-100 flex justify-between items-center">
+              <span className="text-xs text-slate-400">Active prescriptions</span>
+              <Link to="/medications" className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-0.5">
+                <span>Manage</span>
+                <ArrowRight className="h-3 w-3" />
+              </Link>
+            </div>
+          </div>
+
+          {/* Card 3 - Reports */}
           <div className="bg-white rounded-3xl shadow-sm p-6 border border-slate-200/50 hover:shadow-xl hover:shadow-slate-100 hover:border-emerald-500/20 transition-all duration-300 transform hover:-translate-y-0.5">
             <div className="flex items-center justify-between">
               <div>
@@ -267,8 +299,8 @@ const Dashboard = () => {
             </div>
           </div>
 
-          {/* Card 3 - Health Score */}
-          <div className="bg-white rounded-3xl shadow-sm p-6 border border-slate-200/50 hover:shadow-xl hover:shadow-slate-100 hover:border-rose-500/20 transition-all duration-300 transform hover:-translate-y-0.5 sm:col-span-2 lg:col-span-1">
+          {/* Card 4 - Health Score */}
+          <div className="bg-white rounded-3xl shadow-sm p-6 border border-slate-200/50 hover:shadow-xl hover:shadow-slate-100 hover:border-rose-500/20 transition-all duration-300 transform hover:-translate-y-0.5">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-1">Health Score</p>
@@ -312,32 +344,29 @@ const Dashboard = () => {
                 <span className="text-[10px] text-slate-400">No data found</span>
               )}
             </div>
+          </div>
+        </div>
 
-            {/* Health Score Expandable Details Panel */}
-            {showHealthDetails && healthSummary && (
-              <div className="mt-4 text-xs text-slate-600 bg-gradient-to-br from-rose-50/50 to-pink-50/30 border border-rose-200/50 rounded-2xl p-4 transition-all animate-fade-in">
-                <p className="font-bold text-rose-800 mb-1.5 flex items-center gap-1">
-                  <Star className="h-3.5 w-3.5 fill-rose-600 text-rose-600" />
-                  Health Insights
-                </p>
-                <p className="leading-relaxed mb-3 text-slate-700">{healthSummary}</p>
-                {healthRecommendations.length > 0 && (
-                  <div>
-                    <p className="font-semibold text-rose-700 mb-1">Key Recommendations:</p>
-                    <ul className="space-y-1 text-slate-600 pl-1">
-                      {healthRecommendations.slice(0, 3).map((item, index) => (
-                        <li key={index} className="flex items-start gap-1">
-                          <span className="text-rose-500 font-bold">•</span>
-                          <span>{item}</span>
-                        </li>
-                      ))}
-                    </ul>
+        {/* Health Insights Expandable Panel (moved outside the grid for better layout) */}
+        {showHealthDetails && healthSummary && (
+          <div className="mb-8 text-sm text-slate-600 bg-white border border-rose-100 rounded-3xl p-6 shadow-sm animate-fade-in">
+            <p className="font-bold text-rose-800 mb-3 flex items-center gap-2">
+              <Star className="h-5 w-5 fill-rose-600 text-rose-600" />
+              Your Health Insights & Recommendations
+            </p>
+            <p className="leading-relaxed mb-4 text-slate-700">{healthSummary}</p>
+            {healthRecommendations.length > 0 && (
+              <div className="grid sm:grid-cols-3 gap-4">
+                {healthRecommendations.slice(0, 3).map((item, index) => (
+                  <div key={index} className="bg-rose-50/50 p-4 rounded-2xl border border-rose-100/50 flex items-start gap-2">
+                    <span className="bg-rose-100 text-rose-700 w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 text-[10px] font-bold">{index + 1}</span>
+                    <span className="text-xs text-slate-600 leading-snug">{item}</span>
                   </div>
-                )}
+                ))}
               </div>
             )}
           </div>
-        </div>
+        )}
 
         {/* Assessment Form Modal Dialog */}
         {showHealthForm && (

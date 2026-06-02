@@ -12,6 +12,7 @@ import authRoutes from './routes/auth.routes.js';
 import chatbotRoutes from './routes/chatbot.routes.js';
 import reportRoutes from './routes/report.routes.js';
 import newsRoutes from './routes/news.routes.js';
+import medicationRoutes from './routes/medication.routes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -33,6 +34,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/chatbot', chatbotRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/news', newsRoutes);
+app.use('/api/medications', medicationRoutes);
 
 // Health check
 app.get('/health', (req, res) => {

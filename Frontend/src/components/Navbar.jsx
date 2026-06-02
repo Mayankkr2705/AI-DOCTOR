@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { Stethoscope, Menu, X, UserCircle, Home, Bot, FileBarChart, Rss, LayoutDashboard, LogOut, LogIn, UserPlus } from 'lucide-react';
+import { Stethoscope, Menu, X, UserCircle, Home, Bot, FileBarChart, Rss, LayoutDashboard, LogOut, LogIn, UserPlus, Pill } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 
@@ -45,6 +45,10 @@ const Navbar = () => {
             <Link to="/reports" className="text-white/80 hover:text-teal-300 hover:bg-white/5 py-2 px-3 rounded-lg transition-all duration-200 flex items-center space-x-1.5" title="Reports">
               <FileBarChart className="h-4 w-4" />
               <span className="hidden lg:inline text-sm font-medium">Reports</span>
+            </Link>
+            <Link to="/medications" className="text-white/80 hover:text-teal-300 hover:bg-white/5 py-2 px-3 rounded-lg transition-all duration-200 flex items-center space-x-1.5" title="Medications">
+              <Pill className="h-4 w-4" />
+              <span className="hidden lg:inline text-sm font-medium">Medications</span>
             </Link>
             <Link to="/news" className="text-white/80 hover:text-teal-300 hover:bg-white/5 py-2 px-3 rounded-lg transition-all duration-200 flex items-center space-x-1.5" title="Health News">
               <Rss className="h-4 w-4" />
@@ -144,6 +148,14 @@ const Navbar = () => {
             >
               <FileBarChart className="h-4 w-4 text-teal-400" />
               <span>Reports</span>
+            </Link>
+            <Link
+              to="/medications"
+              className="flex items-center space-x-2 px-3 py-2 text-white/90 hover:text-white hover:bg-white/5 rounded-lg transition"
+              onClick={() => setIsOpen(false)}
+            >
+              <Pill className="h-4 w-4 text-teal-400" />
+              <span>Medications</span>
             </Link>
             <Link
               to="/news"

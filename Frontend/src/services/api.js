@@ -78,6 +78,34 @@ export const newsAPI = {
   }
 };
 
+// Medication API
+export const medicationAPI = {
+  getMedications: async () => {
+    const response = await axios.get(`${API_URL}/medications`);
+    return response.data;
+  },
+  addMedication: async (data) => {
+    const response = await axios.post(`${API_URL}/medications`, data);
+    return response.data;
+  },
+  updateMedication: async (id, data) => {
+    const response = await axios.put(`${API_URL}/medications/${id}`, data);
+    return response.data;
+  },
+  deleteMedication: async (id) => {
+    const response = await axios.delete(`${API_URL}/medications/${id}`);
+    return response.data;
+  },
+  toggleActive: async (id) => {
+    const response = await axios.patch(`${API_URL}/medications/${id}/toggle`);
+    return response.data;
+  },
+  takeDose: async (id) => {
+    const response = await axios.post(`${API_URL}/medications/${id}/take-dose`);
+    return response.data;
+  }
+};
+
 // Auth API
 export const authAPI = {
   login: async(email, password) => {

@@ -11,6 +11,7 @@ import ChatbotPage from './pages/ChatbotPage';
 import ReportsPage from './pages/ReportsPage';
 import NewsPage from './pages/NewsPage';
 import ProfilePage from './pages/ProfilePage';
+import MedicationPage from './pages/MedicationPage';
 
 
 function App() {
@@ -53,6 +54,14 @@ function App() {
                 element={
                   <ProtectedRoute>
                     <NewsPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/medications"
+                element={
+                  <ProtectedRoute>
+                    <MedicationPage />
                   </ProtectedRoute>
                 }
               />
